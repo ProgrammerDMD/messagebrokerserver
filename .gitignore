@@ -1,0 +1,31 @@
+### Gradle and Build Outputs ###
+.gradle/
+build/
+**/build/
+out/
+.gradletasknamecache
+
+### IntelliJ IDEA (Standard JetBrains IDE) ###
+.idea/
+*.iml
+*.iws
+*.ipr
+!/.idea/runConfigurations/
+!/.idea/icon.svg
+
+### Fleet and VS Code ###
+.fleet/
+.vscode/
+
+### Secrets and Environment Configurations ###
+local.properties
+.env
+*.local.json
+
+### Log files ###
+*.log
+hs_err_pid*.log
+
+### OS Specific ###
+.DS_Store
+Thumbs.db
