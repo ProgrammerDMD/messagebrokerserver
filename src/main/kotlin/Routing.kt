@@ -7,6 +7,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import me.mihaidubceac.model.Message
 import me.mihaidubceac.model.MessageAcknowledgment
+import me.mihaidubceac.model.MessageAcknowledgmentRequest
 import me.mihaidubceac.model.User
 import me.mihaidubceac.model.UserMessagesQuery
 
@@ -68,23 +69,20 @@ fun Application.configureRouting() {
             call.respond(HttpStatusCode.OK)
         }
         post("/acknowledge") {
-            val acknowledgment = call.receive<MessageAcknowledgment>()
-            if (InMemoryStore.messageAcknowledgements.contains(acknowledgment)) {
-                call.respond(HttpStatusCode.Conflict, "Acknowledgment for message ${acknowledgment.messageId} by user ${acknowledgment.userId} already exists")
-                return@post
-            }
-
+            val acknowledgment = call.receive<MessageAcknowledgmentRequest>()
             if (InMemoryStore.users.none { it.id == acknowledgment.userId }) {
                 call.respond(HttpStatusCode.Conflict, "User with id ${acknowledgment.userId} not found")
                 return@post
             }
 
-            if (InMemoryStore.messages.none { it.id == acknowledgment.messageId }) {
-                call.respond(HttpStatusCode.Conflict, "Message with id ${acknowledgment.messageId} not found")
-                return@post
+            acknowledgment.messageIds.forEach {
+                InMemoryStore.messageAcknowledgements.add(
+                    MessageAcknowledgment(
+                        userId = acknowledgment.userId,
+                        messageId = it
+                    )
+                )
             }
-
-            InMemoryStore.messageAcknowledgements.add(acknowledgment)
             call.application.environment.log.info("Acknowledged $acknowledgment")
             call.respond(HttpStatusCode.OK)
         }

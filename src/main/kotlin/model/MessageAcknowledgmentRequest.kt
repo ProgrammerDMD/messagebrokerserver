@@ -3,10 +3,7 @@ package me.mihaidubceac.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Message(
-    val id: String,
+data class MessageAcknowledgmentRequest(
     val userId: String,
-    val topic: String,
-    val content: String,
-    val timestamp: Long,
+    val messageIds: List<String>,
 )
