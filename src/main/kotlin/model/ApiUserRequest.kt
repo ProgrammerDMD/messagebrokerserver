@@ -3,7 +3,6 @@ package me.mihaidubceac.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class User(
+data class ApiUserRequest(
     val id: String,
-    val createdAt: Long,
 )

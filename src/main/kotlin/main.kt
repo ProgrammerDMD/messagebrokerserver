@@ -2,11 +2,11 @@ package me.mihaidubceac
 
 import io.ktor.server.application.Application
 import io.ktor.server.engine.embeddedServer
-import me.mihaidubceac.model.Message
 import me.mihaidubceac.model.MessageAcknowledgment
+import me.mihaidubceac.model.ApiUserRequest
+import me.mihaidubceac.model.Message
 import me.mihaidubceac.model.User
 import java.util.Collections
-import java.util.concurrent.ConcurrentHashMap
 
 object InMemoryStore {
     val users = Collections.synchronizedList(mutableListOf<User>())
