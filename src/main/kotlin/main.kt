@@ -2,19 +2,12 @@ package me.mihaidubceac
 
 import io.ktor.server.application.Application
 import io.ktor.server.engine.embeddedServer
-import me.mihaidubceac.model.MessageAcknowledgment
-import me.mihaidubceac.model.ApiUserRequest
-import me.mihaidubceac.model.Message
-import me.mihaidubceac.model.User
-import java.util.Collections
-
-object InMemoryStore {
-    val users = Collections.synchronizedList(mutableListOf<User>())
-    val messageAcknowledgements = Collections.synchronizedSet(mutableSetOf<MessageAcknowledgment>())
-    val messages = Collections.synchronizedList(mutableListOf<Message>())
-}
+import me.mihaidubceac.db.DatabaseFactory
+import me.mihaidubceac.rootModule
 
 fun main(args: Array<String>) {
+    DatabaseFactory.init()
+
     embeddedServer(
         factory = io.ktor.server.netty.Netty,
         port = 8080,

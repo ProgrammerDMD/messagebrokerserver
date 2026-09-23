@@ -7,10 +7,8 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import me.mihaidubceac.model.ApiMessageRequest
 import me.mihaidubceac.model.Message
-import me.mihaidubceac.model.MessageAcknowledgment
 import me.mihaidubceac.model.MessageAcknowledgmentRequest
 import me.mihaidubceac.model.ApiUserRequest
-import me.mihaidubceac.model.User
 import java.util.UUID
 
 private const val MAX_ID_LENGTH = 200
@@ -29,23 +27,21 @@ fun Application.configureRouting() {
                 call.respond(HttpStatusCode.BadRequest, "requestId must be non-blank and at most $MAX_ID_LENGTH characters")
                 return@post
             }
-
             if (receivedMessage.userId.isBlank() || receivedMessage.userId.length > MAX_ID_LENGTH) {
                 call.respond(HttpStatusCode.BadRequest, "userId must be non-blank and at most $MAX_ID_LENGTH characters")
                 return@post
             }
-
             if (receivedMessage.topic.isBlank() || receivedMessage.topic.length > MAX_TOPIC_LENGTH) {
                 call.respond(HttpStatusCode.BadRequest, "topic must be non-blank and at most $MAX_TOPIC_LENGTH characters")
                 return@post
             }
-
             if (receivedMessage.content.isBlank() || receivedMessage.content.length > MAX_CONTENT_LENGTH) {
                 call.respond(HttpStatusCode.BadRequest, "content must be non-blank and at most $MAX_CONTENT_LENGTH characters")
                 return@post
             }
 
-            if (InMemoryStore.users.none { it.id == receivedMessage.userId }) {
+            val user = Store.findUser(receivedMessage.userId)
+            if (user == null) {
                 call.respond(HttpStatusCode.NotFound, "User with id ${receivedMessage.userId} not found")
                 return@post
             }
@@ -53,7 +49,6 @@ fun Application.configureRouting() {
             call.application.environment.log.info(
                 "New message request: requestId=${receivedMessage.requestId} userId=${receivedMessage.userId} topic=${receivedMessage.topic}"
             )
-
             val createdMessage = Message(
                 messageId = UUID.randomUUID().toString(),
                 requestId = receivedMessage.requestId,
@@ -63,7 +58,7 @@ fun Application.configureRouting() {
                 timestamp = System.currentTimeMillis()
             )
 
-            InMemoryStore.messages.add(createdMessage)
+            Store.addMessage(createdMessage)
             call.respond(HttpStatusCode.Created, createdMessage)
         }
         get("/messages/{userId}") {
@@ -73,21 +68,13 @@ fun Application.configureRouting() {
                 return@get
             }
 
-            val user = InMemoryStore.users.find { it.id == userId }
+            val user = Store.findUser(userId)
             if (user == null) {
                 call.respond(HttpStatusCode.NotFound, "User with id $userId not found")
                 return@get
             }
 
-            val acknowledgedMessages = InMemoryStore.messageAcknowledgements
-                .filter { it.userId == userId }
-                .map { it.messageId }
-                .toSet()
-            val messagesRemaining = InMemoryStore.messages.filter {
-                it.messageId !in acknowledgedMessages && it.timestamp > user.createdAt
-            }
-
-            call.respond(messagesRemaining)
+            call.respond(Store.messagesRemainingFor(user))
         }
         post("/connect") {
             val apiUserRequest = call.receive<ApiUserRequest>()
@@ -96,20 +83,11 @@ fun Application.configureRouting() {
                 call.respond(HttpStatusCode.BadRequest, "id must be non-blank and at most $MAX_ID_LENGTH characters")
                 return@post
             }
-            if (InMemoryStore.users.any { it.id == apiUserRequest.id }) {
-                call.respond(HttpStatusCode.Conflict, "User with id ${apiUserRequest.id} already exists")
-                return@post
-            }
 
-            InMemoryStore.users.add(
-                User(
-                    id = apiUserRequest.id,
-                    createdAt = System.currentTimeMillis()
-                )
-            )
+            val user = Store.upsertUser(apiUserRequest.id, System.currentTimeMillis())
 
-            call.application.environment.log.info("Added user ${apiUserRequest.id}")
-            call.respond(HttpStatusCode.OK)
+            call.application.environment.log.info("Connected user ${user.id}")
+            call.respond(HttpStatusCode.OK, user)
         }
         post("/acknowledge") {
             val acknowledgment = call.receive<MessageAcknowledgmentRequest>()
@@ -118,32 +96,25 @@ fun Application.configureRouting() {
                 call.respond(HttpStatusCode.BadRequest, "userId must be non-blank")
                 return@post
             }
-
             if (acknowledgment.messageIds.isEmpty()) {
                 call.respond(HttpStatusCode.BadRequest, "messageIds must not be empty")
                 return@post
             }
 
-            if (InMemoryStore.users.none { it.id == acknowledgment.userId }) {
+            val user = Store.findUser(acknowledgment.userId)
+            if (user == null) {
                 call.respond(HttpStatusCode.NotFound, "User with id ${acknowledgment.userId} not found")
                 return@post
             }
 
-            val existingMessageIds = InMemoryStore.messages.map { it.messageId }.toSet()
-            val unknownIds = acknowledgment.messageIds.filter { it !in existingMessageIds }
+            val existingIds = Store.existingMessageIds(acknowledgment.messageIds)
+            val unknownIds = acknowledgment.messageIds.filterNot { it in existingIds }
             if (unknownIds.isNotEmpty()) {
                 call.respond(HttpStatusCode.BadRequest, "Unknown messageIds: $unknownIds")
                 return@post
             }
 
-            acknowledgment.messageIds.forEach {
-                InMemoryStore.messageAcknowledgements.add(
-                    MessageAcknowledgment(
-                        userId = acknowledgment.userId,
-                        messageId = it
-                    )
-                )
-            }
+            Store.acknowledge(acknowledgment.userId, acknowledgment.messageIds)
             call.application.environment.log.info(
                 "Acknowledged ${acknowledgment.messageIds.size} messages for user ${acknowledgment.userId}"
             )
