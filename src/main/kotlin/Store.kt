@@ -79,7 +79,7 @@ object Store {
             .map { it[MessageAcknowledgmentsTable.messageId] }
             .toSet()
 
-        MessagesTable.select { MessagesTable.timestamp greater user.createdAt }
+        MessagesTable.selectAll()
             .map { it.toMessage() }
             .filter { it.messageId !in acknowledgedIds }
     }
